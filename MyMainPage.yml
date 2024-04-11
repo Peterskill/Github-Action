@@ -1,0 +1,61 @@
+name: "Auto"
+on:
+    push:
+        branches:
+            - 'master'
+env:
+    TF_LOG: INFO
+    AWS_REGION: ${{ secrets.AWS_REGION }}
+jobs:
+    buildup:
+        name: Build and upload
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v2.5.0
+
+            - name: Use Node 14.x
+              uses: actions/setup-node@v1
+              with:
+                node-version: '18.x'
+            - name: Install dependencies
+              run: npm install
+            - name: Install dependencies ci
+              run: npm ci
+            - name: Build
+              run: npm run build
+
+
+            - name: Config AWS Credentials setup
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                aws-region: ${{ secrets.AWS_REGION }}
+                aws-secret-access-key: ${{secrets.AWS_SECRET_KEY}}
+                aws-access-key-id: ${{secrets.AWS_ACCESS_KEY}}
+
+            - name: AWS-angular update
+              uses: jakejarvis/s3-sync-action@master
+              with:
+                args: --acl public-read
+              env:
+                AWS_S3_BUCKET: ${{secrets.AWS_S3}}
+                AWS_ACCESS_KEY_ID: ${{secrets.AWS_ACCESS_KEY}}
+                AWS_SECRET_ACCESS_KEY: ${{secrets.AWS_SECRET_KEY}}
+                AWS_REGION: ${{secrets.AWS_REGION}}
+                SOURCE_DIR: dist/my-main-site
+            - name: Invalidate CloudFront
+              uses: chetan/invalidate-cloudfront-action@v2
+              env:
+                    DISTRIBUTION: ${{ secrets.AWS_DISTRIBUTION }}
+                    PATHS: "/*"
+                    AWS_REGION: "us-east-1"
+                    AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
+                    AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
+            - name: Invalidate CloudFront old
+              uses: chetan/invalidate-cloudfront-action@v2
+              env:
+                    DISTRIBUTION: ${{ secrets.AWS_DISTRIBUTIONOLD }}
+                    PATHS: "/*"
+                    AWS_REGION: "us-east-1"
+                    AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
+                    AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
